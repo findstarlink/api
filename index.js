@@ -50,7 +50,7 @@ exports.handler = async (event) => {
 	}
 
 	console.log('starting')
-	var TLE = await tleFetcher.fetch()
+	var TLE = await tleFetcher.fetchTLE()
 	console.log('downloaded tle')
 
 	let params = {}
