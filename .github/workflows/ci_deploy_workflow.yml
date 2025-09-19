@@ -1,0 +1,73 @@
+# Generated initially using github-actions-wizard (https://github.com/cmdr2/github-actions-wizard)
+
+name: CI Pipeline
+run-name: CI Pipeline
+on:
+  push:
+    branches:
+    - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 22.x
+    - name: Install Dependencies
+      run: npm ci
+    - name: Create Zip Archive
+      run: |-
+        zip -r build.zip . -x '.git/*' '.github/*' '.gitignore' 'LICENSE' 'README.md' '*.sh'
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: build
+        path: build.zip
+
+  deploy_to_aws_lambda_on_main_push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    steps:
+    - name: Download Artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: build
+        path: .
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.LAMBDA_DEPLOY_ROLE }}
+        aws-region: us-east-1
+    - name: Deploy to Lambda
+      run: |-
+        aws lambda update-function-code --function-name '${{ secrets.LAMBDA_FUNCTION_NAME }}' --zip-file 'fileb://build.zip' --query LastUpdateStatus
+
+  post_deploy_http_call:
+    needs: deploy_to_aws_lambda_on_main_push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - name: Call HTTP endpoint
+      run: |-
+        curl -L -X GET '${{ secrets.ENDPOINT_URL }}' -o response.json -w 'Response code: %{response_code}\n'
+    - name: Check HTTP response
+      run: |-
+        echo "Checking response for string: currentLocalTime"
+        if grep -q "currentLocalTime" response.json; then
+          echo "Response check passed"
+        else
+          echo "Response check failed!"
+          echo "Got response:"
+          cat response.json
+          exit 1
+        fi
