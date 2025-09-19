@@ -59,7 +59,7 @@ jobs:
     steps:
     - name: Call HTTP endpoint
       run: |-
-        curl -L -X GET '${{ secrets.ENDPOINT_URL }}&ts=$(date +%s)' -o response.json -w 'Response code: %{response_code}\n'
+        curl -L -X GET "${{ secrets.ENDPOINT_URL }}&ts=$(date +%s)" -o response.json -w 'Response code: %{response_code}\n'
     - name: Check HTTP response
       run: |-
         echo "Checking response for string: currentLocalTime"
